@@ -2,8 +2,10 @@ package com.bankBackend
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
-import com.bankBackend.rest.restOperation
+import com.bankBackend.models.Balance
 import com.bankBackend.rest.restUser
+import com.bankBackend.tables.balanceTable
+import com.bankBackend.tables.creditTable
 import io.ktor.application.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -14,6 +16,7 @@ import io.ktor.auth.jwt.jwt
 import io.ktor.features.*
 import io.ktor.serialization.*
 import io.ktor.util.*
+import models.Credit
 import models.Operation
 import models.User
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -80,9 +83,10 @@ fun Application.module(testing: Boolean = false) {
         simpleJwt,
         RepoDSL(userTable),
         User.serializer(),
-    )
-
-    restOperation(
+        RepoDSL(balanceTable),
+        Balance.serializer(),
+        RepoDSL(creditTable),
+        Credit.serializer(),
         RepoDSL(operationTable),
         Operation.serializer()
     )
@@ -90,6 +94,8 @@ fun Application.module(testing: Boolean = false) {
     transaction {
         SchemaUtils.create(userTable)
         SchemaUtils.create(operationTable)
+        SchemaUtils.create(balanceTable)
+        SchemaUtils.create(creditTable)
     }
 
     routing {
