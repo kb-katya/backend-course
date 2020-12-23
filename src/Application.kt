@@ -17,7 +17,6 @@ import io.ktor.features.*
 import io.ktor.serialization.*
 import io.ktor.util.*
 import models.Credit
-import models.Operation
 import models.User
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -65,14 +64,17 @@ fun Application.module(testing: Boolean = false) {
     install(AutoHeadResponse)
 
     install(CORS) {
+        header(HttpHeaders.ContentType)
         method(HttpMethod.Options)
+        method(HttpMethod.Get)
+        method(HttpMethod.Post)
         method(HttpMethod.Put)
         method(HttpMethod.Delete)
         method(HttpMethod.Patch)
-        header(HttpHeaders.Authorization)
-        header("MyCustomHeader")
+        header(HttpHeaders.AccessControlAllowHeaders)
+        header(HttpHeaders.AccessControlAllowOrigin)
         allowCredentials = true
-        anyHost() // @TODO: Don't do this in production if possible. Try to limit it.
+        anyHost()
     }
 
     install(DefaultHeaders) {
@@ -87,8 +89,6 @@ fun Application.module(testing: Boolean = false) {
         Balance.serializer(),
         RepoDSL(creditTable),
         Credit.serializer(),
-        RepoDSL(operationTable),
-        Operation.serializer()
     )
 
     transaction {

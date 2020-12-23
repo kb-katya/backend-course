@@ -12,10 +12,7 @@ import io.ktor.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import models.AuthUserPayload
-import models.Credit
-import models.Operation
-import models.User
+import models.*
 import org.mindrot.jbcrypt.BCrypt
 import repo.Repo
 
@@ -27,8 +24,6 @@ fun Application.restUser(
         balanceSerializer: KSerializer<Balance>,
         creditRepo: Repo<Credit>,
         creditSerializer: KSerializer<Credit>,
-        operationRepo: Repo<Operation>,
-        operationSerializer: KSerializer<Operation>
 ) {
     val path = "/users"
     routing {
@@ -38,7 +33,7 @@ fun Application.restUser(
             if (user == null || !BCrypt.checkpw(post.password, user.password)) {
                 call.respond(HttpStatusCode.BadRequest, "Email and password do not match")
             } else {
-                call.respond(mapOf("token" to simpleJwt.sign(user.email)))
+                call.respond(UserWithToken(simpleJwt.sign(user.email), user))
             }
         }
         post("${path}/registry") {
@@ -46,19 +41,33 @@ fun Application.restUser(
                 if (userRepo.read().none { it.email == el.email }) {
                     val password = BCrypt.hashpw(el.password, BCrypt.gensalt())
                     if (userRepo.create(User(el.id, el.name, el.email, password, el.active))) {
-                        val user = userRepo.read().find { it.email == el.email }!!
-                        call.respond(user)
+                        userRepo.read().find { it.email == el.email }!!
+                        call.respond(HttpStatusCode.Created)
                     } else {
                         call.respond(HttpStatusCode.NotFound)
                     }
                 } else {
                     call.respond(HttpStatusCode.Conflict, "User already exists")
                 }
-            } ?: call.respond(HttpStatusCode.BadRequest, "Parse error")
+            } ?: call.respond(HttpStatusCode.BadRequest)
         }
         authenticate {
             get("/user" ) {
                 call.respond(HttpStatusCode.OK)
+            }
+            get("/user/{id}/balances") {
+                parseId()?.let { id ->
+                    balanceRepo.read().let { elem ->
+                        call.respond(elem.filter { it.userId == id })
+                    }
+                } ?: call.respond(HttpStatusCode.BadRequest)
+            }
+            get("/user/{id}/credits") {
+                parseId()?.let { id ->
+                    creditRepo.read().let { elem ->
+                        call.respond(elem.filter { it.userId == id })
+                    }
+                } ?: call.respond(HttpStatusCode.BadRequest)
             }
             route("/user/{id}/balance/{balanceID}") {
                 get {
@@ -86,22 +95,22 @@ fun Application.restUser(
                         }
                     }?: call.respond(HttpStatusCode.BadRequest)
                 }
-                }
-            put("/user/{id}/balancetransf") {
+            }
+            put("/user/{id}/balance-transfer") {
                 val post = call.receive<Balance_transfer>()
-                val balan = balanceRepo.read().find { it.id == post.id1 }
-                val balan1 = balanceRepo.read().find { it.id == post.id2 }
-                if (balan != null && balan1 != null) {
-                    if(balan.sum >= post.sum) {
-                        balan.sum -= post.sum
-                        balan1.sum += post.sum
-                        balanceRepo.update(balan.id, balan)
-                        balanceRepo.update(balan1.id,balan1)
-                        call.respond(HttpStatusCode.OK)
+                val balance1 = balanceRepo.read().find { it.id == post.id1 }
+                val balance2 = balanceRepo.read().find { it.id == post.id2 }
+                if (balance1 != null && balance2 != null) {
+                    if(balance1.sum >= post.sum) {
+                        balance1.sum -= post.sum
+                        balance2.sum += post.sum
+                        balanceRepo.update(balance1.id, balance1)
+                        balanceRepo.update(balance2.id, balance2)
+                        call.respond(listOf(balance1, balance2))
                     }
                     else
                         call.respond(HttpStatusCode.BadRequest)
-                }else {
+                } else {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
@@ -125,14 +134,14 @@ fun Application.restUser(
                 }
                 put {
                     val post = call.receive<Balance_transfer>()
-                    val balan = balanceRepo.read().find { it.id == post.id1 }
-                    val balan1 = creditRepo.read().find { it.id == post.id2 }
-                    if (balan != null && balan1 != null) {
-                        if(balan1.balance >= post.sum) {
-                            balan.sum += post.sum
-                            balan1.balance -= post.sum
-                            creditRepo.update(balan1.id,balan1)
-                            balanceRepo.update(balan.id, balan)
+                    val balance = balanceRepo.read().find { it.id == post.id1 }
+                    val credit = creditRepo.read().find { it.id == post.id2 }
+                    if (balance != null && credit != null) {
+                        if(credit.balance >= post.sum) {
+                            balance.sum += post.sum
+                            credit.balance -= post.sum
+                            creditRepo.update(credit.id, credit)
+                            balanceRepo.update(balance.id, balance)
                             call.respond(HttpStatusCode.OK)
                         }
                         else
@@ -144,25 +153,24 @@ fun Application.restUser(
             }
             put ("/user/{id}/payCredit") {
                 val post = call.receive<Balance_transfer>()
-                val balan = balanceRepo.read().find { it.id == post.id1 }
-                val balan1 = creditRepo.read().find { it.id == post.id2 }
-                if (balan != null && balan1 != null) {
-                    if(balan1.balance >= post.sum) {
-                        balan.sum -= post.sum
-                        balan1.sumCredit -= post.sum
-                        creditRepo.update(balan1.id,balan1)
-                        balanceRepo.update(balan.id, balan)
+                val balance = balanceRepo.read().find { it.id == post.id1 }
+                val credit = creditRepo.read().find { it.id == post.id2 }
+                if (balance != null && credit != null) {
+                    if (credit.balance >= post.sum) {
+                        balance.sum -= post.sum
+                        credit.sumCredit -= post.sum
+                        creditRepo.update(credit.id,credit)
+                        balanceRepo.update(balance.id, balance)
                         call.respond(HttpStatusCode.OK)
-                    }
-                    else
+                    } else
                         call.respond(HttpStatusCode.BadRequest)
-                }else {
+                } else {
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
-            }
         }
     }
+}
 
 fun PipelineContext<Unit, ApplicationCall>.parseId(id: String = "id") =
     call.parameters[id]?.toIntOrNull()

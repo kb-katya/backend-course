@@ -14,3 +14,6 @@ class User (
 
 @Serializable
 data class AuthUserPayload(val email: String, val password: String)
+
+@Serializable
+data class UserWithToken(val token: String, val user: User)
