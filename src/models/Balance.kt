@@ -9,11 +9,11 @@ class Balance(
         var sum : Int,
         val name: String,
         val userId: Int
-        ) : Item
+) : Item
 
 @Serializable
-class Balance_transfer (
+class BalanceTransfer (
         val id1 : Int,
         val id2 : Int,
         val sum : Int
-        )
+)

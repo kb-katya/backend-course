@@ -2,7 +2,7 @@ package com.bankBackend.rest
 
 import com.bankBackend.SimpleJWT
 import com.bankBackend.models.Balance
-import com.bankBackend.models.Balance_transfer
+import com.bankBackend.models.BalanceTransfer
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -15,6 +15,8 @@ import kotlinx.serialization.json.Json
 import models.*
 import org.mindrot.jbcrypt.BCrypt
 import repo.Repo
+import rest.parseBody
+import rest.parseId
 
 fun Application.restUser(
         simpleJwt: SimpleJWT,
@@ -71,11 +73,11 @@ fun Application.restUser(
             }
             route("/user/{id}/balance/{balanceID}") {
                 get {
-                    parseId("balanceID")?.let { id ->
-                        balanceRepo.read(id)?.let { elem ->
-                                call.respond(elem.sum)
+                    parseId()?.let { id ->
+                        balanceRepo.read().let { elem ->
+                            call.respond(elem.filter { it.userId == id })
                         }
-                    }
+                    } ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 post {
                     parseBody(balanceSerializer)?.let {
@@ -84,6 +86,33 @@ fun Application.restUser(
                         else
                             call.respond(HttpStatusCode.NotFound)
                     }?: call.respond(HttpStatusCode.BadRequest)
+                }
+            }
+            route("/user/{id}/credits") {
+                get {
+                    parseId()?.let { id ->
+                        creditRepo.read().let { elem ->
+                            call.respond(elem.filter { it.userId == id })
+                        }
+                    } ?: call.respond(HttpStatusCode.BadRequest)
+                }
+                post {
+                    parseBody(creditSerializer)?.let { credit ->
+                        if (creditRepo.create(credit)) {
+                            call.respond(HttpStatusCode.OK, "Credit created")
+                        }
+                        else
+                            call.respond(HttpStatusCode.NotFound)
+                    }?: call.respond(HttpStatusCode.BadRequest)
+                }
+            }
+            route("/user/{id}/balance/{balanceID}") {
+                get {
+                    parseId("balanceID")?.let { id ->
+                        balanceRepo.read(id)?.let { elem ->
+                            call.respond(elem)
+                        }
+                    }
                 }
                 put {
                     parseBody(balanceSerializer)?.let {
@@ -97,7 +126,7 @@ fun Application.restUser(
                 }
             }
             put("/user/{id}/balance-transfer") {
-                val post = call.receive<Balance_transfer>()
+                val post = call.receive<BalanceTransfer>()
                 val balance1 = balanceRepo.read().find { it.id == post.id1 }
                 val balance2 = balanceRepo.read().find { it.id == post.id2 }
                 if (balance1 != null && balance2 != null) {
@@ -114,28 +143,18 @@ fun Application.restUser(
                     call.respond(HttpStatusCode.NotFound)
                 }
             }
-            route("/user/{id}/credit"){
+            route("/user/{id}/credit/{creditId}"){
                 get {
-                    parseId()?.let { id ->
+                    parseId("creditId")?.let { id ->
                         creditRepo.read(id)?.let { elem ->
-                            call.respond(elem.sumCredit)
-                            call.respond(elem.balance)
+                            call.respond(elem)
                         }
                     }
                 }
-                post {
-                    parseBody(creditSerializer)?.let { credit ->
-                        if (creditRepo.create(credit)) {
-                            call.respond(HttpStatusCode.OK, "Credit created")
-                        }
-                        else
-                            call.respond(HttpStatusCode.NotFound)
-                    }?: call.respond(HttpStatusCode.BadRequest)
-                }
                 put {
-                    val post = call.receive<Balance_transfer>()
-                    val balance = balanceRepo.read().find { it.id == post.id1 }
-                    val credit = creditRepo.read().find { it.id == post.id2 }
+                    val post = call.receive<BalanceTransfer>()
+                    val balance = balanceRepo.read().find { it.id == post.id2 }
+                    val credit = creditRepo.read().find { it.id == post.id1 }
                     if (balance != null && credit != null) {
                         if(credit.balance >= post.sum) {
                             balance.sum += post.sum
@@ -146,15 +165,15 @@ fun Application.restUser(
                         }
                         else
                             call.respond(HttpStatusCode.BadRequest)
-                    }else {
+                    } else {
                         call.respond(HttpStatusCode.NotFound)
                     }
                 }
             }
-            put ("/user/{id}/payCredit") {
-                val post = call.receive<Balance_transfer>()
-                val balance = balanceRepo.read().find { it.id == post.id1 }
-                val credit = creditRepo.read().find { it.id == post.id2 }
+            put ("/user/{id}/pay-credit") {
+                val post = call.receive<BalanceTransfer>()
+                val balance = balanceRepo.read().find { it.id == post.id2 }
+                val credit = creditRepo.read().find { it.id == post.id1 }
                 if (balance != null && credit != null) {
                     if (credit.balance >= post.sum) {
                         balance.sum -= post.sum

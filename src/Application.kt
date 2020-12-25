@@ -73,6 +73,7 @@ fun Application.module(testing: Boolean = false) {
         method(HttpMethod.Patch)
         header(HttpHeaders.AccessControlAllowHeaders)
         header(HttpHeaders.AccessControlAllowOrigin)
+        header("Authorization")
         allowCredentials = true
         anyHost()
     }
