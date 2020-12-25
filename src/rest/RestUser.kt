@@ -190,18 +190,3 @@ fun Application.restUser(
         }
     }
 }
-
-fun PipelineContext<Unit, ApplicationCall>.parseId(id: String = "id") =
-    call.parameters[id]?.toIntOrNull()
-
-suspend fun <T> PipelineContext<Unit, ApplicationCall>.parseBody(
-    serializer: KSerializer<T>
-) =
-    try {
-        Json.decodeFromString(
-            serializer,
-            call.receive()
-        )
-    } catch (e: Throwable) {
-        null
-    }

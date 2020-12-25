@@ -32,7 +32,7 @@ fun <T : Item> Application.restRepo(
                 )
             }
         }
-        route("$path/{itemId}") {
+        route("$path/{id}") {
             get {
                 parseId()?.let { id ->
                     repo.read(id)?.let { elem ->
@@ -66,7 +66,7 @@ fun <T : Item> Application.restRepo(
     }
 }
 
-fun PipelineContext<Unit, ApplicationCall>.parseId(id: String = "itemId") =
+fun PipelineContext<Unit, ApplicationCall>.parseId(id: String = "id") =
     call.parameters[id]?.toIntOrNull()
 
 suspend fun <T> PipelineContext<Unit, ApplicationCall>.parseBody(
