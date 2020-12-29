@@ -57,21 +57,7 @@ fun Application.restUser(
             get("/user" ) {
                 call.respond(HttpStatusCode.OK)
             }
-            get("/user/{id}/balances") {
-                parseId()?.let { id ->
-                    balanceRepo.read().let { elem ->
-                        call.respond(elem.filter { it.userId == id })
-                    }
-                } ?: call.respond(HttpStatusCode.BadRequest)
-            }
-            get("/user/{id}/credits") {
-                parseId()?.let { id ->
-                    creditRepo.read().let { elem ->
-                        call.respond(elem.filter { it.userId == id })
-                    }
-                } ?: call.respond(HttpStatusCode.BadRequest)
-            }
-            route("/user/{id}/balance/{balanceID}") {
+            route("/user/{id}/balances") {
                 get {
                     parseId()?.let { id ->
                         balanceRepo.read().let { elem ->
@@ -83,24 +69,6 @@ fun Application.restUser(
                     parseBody(balanceSerializer)?.let {
                         if (balanceRepo.create(it))
                             call.respond(HttpStatusCode.OK, "Balance created")
-                        else
-                            call.respond(HttpStatusCode.NotFound)
-                    }?: call.respond(HttpStatusCode.BadRequest)
-                }
-            }
-            route("/user/{id}/credits") {
-                get {
-                    parseId()?.let { id ->
-                        creditRepo.read().let { elem ->
-                            call.respond(elem.filter { it.userId == id })
-                        }
-                    } ?: call.respond(HttpStatusCode.BadRequest)
-                }
-                post {
-                    parseBody(creditSerializer)?.let { credit ->
-                        if (creditRepo.create(credit)) {
-                            call.respond(HttpStatusCode.OK, "Credit created")
-                        }
                         else
                             call.respond(HttpStatusCode.NotFound)
                     }?: call.respond(HttpStatusCode.BadRequest)
@@ -122,6 +90,24 @@ fun Application.restUser(
                             else
                                 call.respond(HttpStatusCode.NotFound)
                         }
+                    }?: call.respond(HttpStatusCode.BadRequest)
+                }
+            }
+            route("/user/{id}/credits") {
+                get {
+                    parseId()?.let { id ->
+                        creditRepo.read().let { elem ->
+                            call.respond(elem.filter { it.userId == id })
+                        }
+                    } ?: call.respond(HttpStatusCode.BadRequest)
+                }
+                post {
+                    parseBody(creditSerializer)?.let { credit ->
+                        if (creditRepo.create(credit)) {
+                            call.respond(HttpStatusCode.OK, "Credit created")
+                        }
+                        else
+                            call.respond(HttpStatusCode.NotFound)
                     }?: call.respond(HttpStatusCode.BadRequest)
                 }
             }
@@ -175,7 +161,7 @@ fun Application.restUser(
                 val balance = balanceRepo.read().find { it.id == post.id2 }
                 val credit = creditRepo.read().find { it.id == post.id1 }
                 if (balance != null && credit != null) {
-                    if (credit.balance >= post.sum) {
+                    if (balance.sum >= post.sum) {
                         balance.sum -= post.sum
                         credit.sumCredit -= post.sum
                         creditRepo.update(credit.id,credit)
